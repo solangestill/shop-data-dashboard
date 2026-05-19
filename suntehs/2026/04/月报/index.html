@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>suntehs-4月经营分析-轻量版</title>
+    <style>
+        :root {
+            --primary: #4A90E2;
+            --secondary: #67C23A;
+            --dark: #2C3E50;
+            --light: #F8F9FA;
+            --border: #E9ECEF;
+            --text-main: #333;
+            --text-muted: #666;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif;
+            background-color: #f4f7f9;
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        header {
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        header h1 {
+            color: var(--dark);
+            font-size: 28px;
+        }
+
+        header .meta {
+            text-align: right;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: var(--light);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .stat-card .label {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: var(--dark);
+            margin-bottom: 20px;
+            padding-left: 10px;
+            border-left: 5px solid var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title small {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+
+        th {
+            background-color: var(--light);
+            color: var(--dark);
+            font-weight: 600;
+            text-align: left;
+            padding: 12px 15px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background-color: #fafafa;
+        }
+
+        .product-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .product-img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+
+        .product-title {
+            max-width: 350px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 500;
+        }
+
+        .product-id {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .badge-hot { background-color: #F56C6C; }
+        .badge-potential { background-color: #E6A23C; }
+        .badge-good { background-color: #67C23A; }
+
+        .owner {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .country-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .highlight {
+            color: #F56C6C;
+            font-weight: bold;
+        }
+
+        footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .country-grid { grid-template-columns: 1fr; }
+            .product-title { max-width: 150px; }
+            header { flex-direction: column; align-items: flex-start; gap: 10px; }
+            header .meta { text-align: left; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div>
+            <h1>suntehs-4月经营分析报告 <small style="font-size: 16px; color: var(--text-muted); font-weight: normal;">(轻量精简版)</small></h1>
+        </div>
+        <div class="meta">
+            周期: 2026-04-01 至 2026-04-30<br>
+            生成时间: 2026-05-12
+        </div>
+    </header>
+
+    <!-- 1. 核心摘要 -->
+    <div class="summary-grid">
+        <div class="stat-card">
+            <div class="label">总曝光量</div>
+            <div class="value">59,009</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">总点击量</div>
+            <div class="value">1,100+</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">总商机数</div>
+            <div class="value">103.0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">总消耗 (CNY)</div>
+            <div class="value">￥5,748.15</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">平均商机成本</div>
+            <div class="value">￥55.81</div>
+        </div>
+    </div>
+
+    <!-- 2. Top 10 爆品推荐 -->
+    <div class="section-title">
+        Top 10 爆品与潜力优品建议
+        <small>按商机转化率与综合得分排序</small>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>排名</th>
+                <th>产品信息</th>
+                <th>负责人</th>
+                <th>曝光</th>
+                <th>点击</th>
+                <th>CTR</th>
+                <th>商机数</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/H22c9c2a71fc945158639c4ad6736e854F/60m-3-in-1-Infrared-Laser.png" class="product-img">
+                        <div>
+                            <div class="product-title" title="60m 3-in-1 Infrared Laser Rangefinder">60m 3-in-1 Infrared Laser Rangefinder</div>
+                            <div class="product-id">ID: 1601631221389</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Anthony</span></td>
+                <td>2,614</td>
+                <td>67</td>
+                <td>2.56%</td>
+                <td class="highlight">8</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/Hd9cf1b02eefd4495a5858f17d15ac03bt/Abrasion-Resistant-Touchscreen-Compatible-15-Gauge.jpg" class="product-img">
+                        <div>
+                            <div class="product-title" title="Touchscreen Compatible MicroFoam Nitrile Gloves">Touchscreen Compatible MicroFoam Nitrile Gloves</div>
+                            <div class="product-id">ID: 1601076749281</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Mina</span></td>
+                <td>1,995</td>
+                <td>72</td>
+                <td>3.61%</td>
+                <td class="highlight">9</td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/H2b75ce0934954a76a65484a6864f831fa/Young-Reporter-Custom-Logo-Printed-Reflective.png" class="product-img">
+                        <div>
+                            <div class="product-title" title="Custom Logo Printed Reflective Safety Vest">Custom Logo Printed Reflective Safety Vest</div>
+                            <div class="product-id">ID: 1601414395822</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Anthony</span></td>
+                <td>1,841</td>
+                <td>61</td>
+                <td>3.31%</td>
+                <td class="highlight">8</td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/H560efce8f6414d5bb94a005fa3dd2a16n/High-Grade-Mini-PVC-ABS-Ruler.jpg" class="product-img">
+                        <div>
+                            <div class="product-title" title="High-Grade Mini PVC & ABS Ruler (5-10m)">High-Grade Mini PVC & ABS Ruler (5-10m)</div>
+                            <div class="product-id">ID: 1601486464581</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Calvin</span></td>
+                <td>1,796</td>
+                <td>56</td>
+                <td>3.12%</td>
+                <td class="highlight">5</td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/Hd7487012e5be4c628ae5e9430886706eF/80-Cotton-Reflective-Strips-One-Piece.png" class="product-img">
+                        <div>
+                            <div class="product-title" title="80% Cotton Reflective Strips One-Piece Coverall">80% Cotton Reflective Strips One-Piece Coverall</div>
+                            <div class="product-id">ID: 1601432807810</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Anthony</span></td>
+                <td>1,784</td>
+                <td>44</td>
+                <td>2.47%</td>
+                <td class="highlight">8</td>
+            </tr>
+            <tr>
+                <td>6</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/H66724d9722664507b003ce5afddc11e7p/High-Precision-Digital-Display-Electronic-Level.png" class="product-img">
+                        <div>
+                            <div class="product-title" title="High-Precision Digital Display Level Ruler">High-Precision Digital Display Level Ruler</div>
+                            <div class="product-id">ID: 1601488503520</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Allen</span></td>
+                <td>1,190</td>
+                <td>39</td>
+                <td>3.28%</td>
+                <td class="highlight">4</td>
+            </tr>
+            <tr>
+                <td>7</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/Hc9acc9f4886e43b889363f3e59f8435fD/Lightweight-1000V-Electrician-Gloves-1KV-Low.png" class="product-img">
+                        <div>
+                            <div class="product-title" title="1000V Electrician Insulated Latex Gloves">1000V Electrician Insulated Latex Gloves</div>
+                            <div class="product-id">ID: 1601398741454</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Anthony</span></td>
+                <td>1,083</td>
+                <td>36</td>
+                <td>3.32%</td>
+                <td class="highlight">4</td>
+            </tr>
+            <tr>
+                <td>8</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/Hed6508215b4d48ff9273e75e15f832cfV/CS-2804-Disposable-Respirator-Anti-Acid.png" class="product-img">
+                        <div>
+                            <div class="product-title" title="CS 2804 Disposable Respirator Gas Mask">CS 2804 Disposable Respirator Gas Mask</div>
+                            <div class="product-id">ID: 1601291919872</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Allen</span></td>
+                <td>35</td>
+                <td>1</td>
+                <td>2.86%</td>
+                <td class="highlight">1</td>
+            </tr>
+            <tr>
+                <td>9</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/He37e8ba1523e44bdaadce25f6874a0cde/Adjustable-Hi-Viz-LED-Flash-Running.jpg" class="product-img">
+                        <div>
+                            <div class="product-title" title="Adjustable Hi Viz LED Safety Running Vest">Adjustable Hi Viz LED Safety Running Vest</div>
+                            <div class="product-id">ID: 1601295849923</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Allen</span></td>
+                <td>34</td>
+                <td>3</td>
+                <td>8.82%</td>
+                <td class="highlight">2</td>
+            </tr>
+            <tr>
+                <td>10</td>
+                <td>
+                    <div class="product-info">
+                        <img src="https://sc04.alicdn.com/kf/H435c8ec8bf34420dbeefe4b9928c8067i/Portwest-Clothing-Flame-Retardant-Anti-Static.jpg" class="product-img">
+                        <div>
+                            <div class="product-title" title="Flame Retardant Anti-Static Overalls">Flame Retardant Anti-Static Overalls</div>
+                            <div class="product-id">ID: 1601686528060</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="owner">Mina</span></td>
+                <td>54</td>
+                <td>3</td>
+                <td>5.56%</td>
+                <td class="highlight">1</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="country-grid">
+        <!-- 3. Top 10 国家分布 -->
+        <div>
+            <div class="section-title">Top 10 国家分布</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>国家/地区</th>
+                        <th>询盘数</th>
+                        <th>占比</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>美国 (USA)</td><td>31</td><td>15.8%</td></tr>
+                    <tr><td>2</td><td>印度尼西亚 (Indonesia)</td><td>9</td><td>4.6%</td></tr>
+                    <tr><td>3</td><td>澳大利亚 (Australia)</td><td>7</td><td>3.6%</td></tr>
+                    <tr><td>4</td><td>巴基斯坦 (Pakistan)</td><td>7</td><td>3.6%</td></tr>
+                    <tr><td>5</td><td>德国 (Germany)</td><td>7</td><td>3.6%</td></tr>
+                    <tr><td>6</td><td>西班牙 (Spain)</td><td>7</td><td>3.6%</td></tr>
+                    <tr><td>7</td><td>英国 (UK)</td><td>6</td><td>3.1%</td></tr>
+                    <tr><td>8</td><td>法国 (France)</td><td>6</td><td>3.1%</td></tr>
+                    <tr><td>9</td><td>巴西 (Brazil)</td><td>6</td><td>3.1%</td></tr>
+                    <tr><td>10</td><td>新加坡 (Singapore)</td><td>6</td><td>3.1%</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 4. 重点负责人 & 订单 -->
+        <div>
+            <div class="section-title">核心团队与重点关注</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>负责人</th>
+                        <th>处理询盘</th>
+                        <th>占比</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Anthony Zhang</strong></td><td>72</td><td>36.7%</td></tr>
+                    <tr><td><strong>Mina Liu</strong></td><td>54</td><td>27.6%</td></tr>
+                    <tr><td><strong>Allen Fan</strong></td><td>53</td><td>27.0%</td></tr>
+                </tbody>
+            </table>
+            <div style="background: #FFFBE6; padding: 15px; border-radius: 8px; border: 1px solid #FFE58F;">
+                <div style="font-weight: bold; margin-bottom: 8px; color: #856404;">🔥 重点跟进大单 (April):</div>
+                <ul style="margin-left: 20px; font-size: 13px;">
+                    <li>Lisa Bradley - <span class="highlight">$408</span> (Active)</li>
+                    <li>Victor Pinho - <span class="highlight">$169</span> (Closed)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. 最近 20 条高价值询盘明细 -->
+    <div class="section-title">
+        最近 20 条高价值询盘明细
+        <small>仅展示去重后的最新记录</small>
+    </div>
+    <table style="font-size: 13px;">
+        <thead>
+            <tr>
+                <th>时间</th>
+                <th>客户名称</th>
+                <th>国家</th>
+                <th>负责人</th>
+                <th>分类</th>
+                <th>买家分层</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>04-30 15:34</td><td>gulet yussuf</td><td>肯尼亚</td><td>Anthony</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-30 14:39</td><td>BOFFOUE MARC</td><td>科特迪瓦</td><td>Allen</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-30 00:39</td><td>bruno saenz</td><td>墨西哥</td><td>Mina</td><td>TM商机</td><td>-</td></tr>
+            <tr><td>04-29 20:03</td><td>Eugene Akorli</td><td>加纳</td><td>Anthony</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-29 17:29</td><td>Sean Momberume</td><td>津巴布韦</td><td>Allen</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-29 11:11</td><td>Anna Wang</td><td>英国</td><td>Mina</td><td>TM商机</td><td>-</td></tr>
+            <tr><td>04-29 09:58</td><td>PembelianDunia</td><td>印尼</td><td>Mina</td><td>TM商机</td><td>-</td></tr>
+            <tr><td>04-29 04:13</td><td>rick garcia</td><td>美国</td><td>Allen</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-29 02:56</td><td>Aissatou Mbengue</td><td>塞内加尔</td><td>Anthony</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-29 01:55</td><td>Arbnor bajrami</td><td>法国</td><td>Mina</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-28 23:52</td><td>martyn joe</td><td>加纳</td><td>Mina</td><td>TM商机</td><td>-</td></tr>
+            <tr><td>04-28 21:29</td><td>Erik Holmgren</td><td>瑞典</td><td>Mina</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-28 20:01</td><td>Edith F</td><td>阿根廷</td><td>Allen</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-28 16:40</td><td>Sinto Wilson</td><td>阿联酋</td><td>Allen</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-28 16:06</td><td>Nic K</td><td>美国</td><td>Anthony</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-28 15:34</td><td>George Job</td><td>坦桑尼亚</td><td>Allen</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-28 14:56</td><td>VietHoang Dong</td><td>澳大利亚</td><td>Allen</td><td>询盘商机</td><td>L1+</td></tr>
+            <tr><td>04-28 14:11</td><td>Asya AlFoori</td><td>荷兰</td><td>Mina</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-28 13:03</td><td>FOCS chris</td><td>巴西</td><td>Calvin</td><td>TM商机</td><td>L1+</td></tr>
+            <tr><td>04-28 08:52</td><td>Vika Li</td><td>美国</td><td>Allen</td><td>TM商机</td><td>-</td></tr>
+        </tbody>
+    </table>
+
+    <footer>
+        &copy; 2026 suntehs Management. Generated by Accio Office Suite.
+    </footer>
+</div>
+
+</body>
+</html>

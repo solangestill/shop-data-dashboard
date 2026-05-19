@@ -1,0 +1,1331 @@
+# -*- coding: utf-8 -*-
+import openpyxl
+import xlrd
+import json
+import os
+from datetime import datetime
+from collections import defaultdict
+import re
+
+# 文件路径 - 自动获取当前脚本所在目录
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+RAW_DIR = os.path.join(BASE_DIR, "原始文件")
+
+# 自动获取店铺名称（从上级文件夹名称提取）
+SHOP_NAME = os.path.basename(os.path.dirname(BASE_DIR))
+print(f"检测到店铺名称: {SHOP_NAME}")
+
+# 读取Excel文件的辅助函数
+def read_excel(filepath, sheet_name=None, header_row=0):
+    """读取Excel文件并返回数据"""
+    try:
+        # 判断文件格式
+        if filepath.endswith('.xls'):
+            # 使用xlrd读取.xls文件
+            wb = xlrd.open_workbook(filepath)
+            if sheet_name:
+                ws = wb.sheet_by_name(sheet_name)
+            else:
+                ws = wb.sheet_by_index(0)
+            
+            data = []
+            headers = []
+            for i in range(ws.nrows):
+                row = ws.row_values(i)
+                if i == header_row:
+                    headers = [str(cell) if cell else f"col_{j}" for j, cell in enumerate(row)]
+                elif i > header_row:
+                    row_dict = {}
+                    for j, cell in enumerate(row):
+                        if j < len(headers):
+                            row_dict[headers[j]] = cell
+                    data.append(row_dict)
+            
+            return data, headers
+        else:
+            # 使用openpyxl读取.xlsx文件
+            wb = openpyxl.load_workbook(filepath, data_only=True)
+            if sheet_name:
+                ws = wb[sheet_name]
+            else:
+                ws = wb.active
+            
+            data = []
+            headers = []
+            for i, row in enumerate(ws.iter_rows(values_only=True)):
+                if i == header_row:
+                    headers = [str(cell) if cell else f"col_{j}" for j, cell in enumerate(row)]
+                elif i > header_row:
+                    row_dict = {}
+                    for j, cell in enumerate(row):
+                        if j < len(headers):
+                            row_dict[headers[j]] = cell
+                    data.append(row_dict)
+            
+            wb.close()
+            return data, headers
+    except Exception as e:
+        print(f"Error reading {filepath}: {e}")
+        return [], []
+
+# 清理数字函数
+def clean_number(value):
+    """清理数字，去除货币符号和百分号"""
+    if value is None:
+        return 0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        # 去除货币符号和百分号
+        value = value.replace('￥', '').replace('%', '').replace(',', '').strip()
+        try:
+            return float(value)
+        except:
+            return 0
+    return 0
+
+print("开始读取数据...")
+
+# 1. 读取账号数据
+accounts_file = None
+for ext in ['.xlsx', '.xls']:
+    test_file = os.path.join(RAW_DIR, f"Accounts-2025-12-01{ext}")
+    if os.path.exists(test_file):
+        accounts_file = test_file
+        break
+
+if accounts_file:
+    accounts_data, _ = read_excel(accounts_file, "员工数据", header_row=5)
+    print(f"读取账号数据: {len(accounts_data)} 条")
+else:
+    accounts_data = []
+    print("警告: 未找到账号数据文件")
+
+# 2. 读取产品数据 - 表头在第6行（索引5）
+products_file = None
+for ext in ['.xlsx', '.xls']:
+    test_file = os.path.join(RAW_DIR, f"Products-2025-12-01{ext}")
+    if os.path.exists(test_file):
+        products_file = test_file
+        break
+
+if products_file:
+    products_data, _ = read_excel(products_file, "产品分析", header_row=5)
+    print(f"读取产品数据: {len(products_data)} 条")
+else:
+    products_data = []
+    print("警告: 未找到产品数据文件")
+
+# 3. 读取产品列表（包含图片）- 尝试多个文件
+product_list_data = []
+product_list_files = [
+    "fixed_产品列表-2026-1-20_13-16-33.xlsx",
+    "fixed_产品列表-2026-1-20_14-24-20.xlsx",
+    "产品列表-2026-1-20_14-24-20.xlsx",
+    "fixed_product_list.xlsx"
+]
+
+for filename in product_list_files:
+    product_list_file = os.path.join(RAW_DIR, filename)
+    if os.path.exists(product_list_file):
+        try:
+            product_list_data, _ = read_excel(product_list_file, "产品列表", header_row=0)
+            print(f"读取产品列表({filename}): {len(product_list_data)} 条")
+            break
+        except:
+            continue
+
+if not product_list_data:
+    print("警告: 无法读取产品列表文件，将使用Products数据")
+
+# 4. 读取全站推广数据
+quanzhan_account_file = os.path.join(RAW_DIR, "全站推广-账户概览(投放时段_2025-12-01_~_2025-12-31,计划类型_全部计划类型,所属于计划_全部计划).xlsx")
+quanzhan_account_data, _ = read_excel(quanzhan_account_file, header_row=0)
+print(f"读取全站推广账户概览: {len(quanzhan_account_data)} 条")
+
+quanzhan_product_file = os.path.join(RAW_DIR, "全站推广-商品(投放时段_2025-12-01_~_2025-12-31,计划类型_全部计划类型,所属于计划_全部计划).xlsx")
+quanzhan_product_data, _ = read_excel(quanzhan_product_file, header_row=0)
+print(f"读取全站推广商品: {len(quanzhan_product_data)} 条")
+
+quanzhan_keyword_file = os.path.join(RAW_DIR, "全站推广-搜索词(投放时段_2025-12-01_~_2025-12-31,计划类型_全部计划类型,所属于计划_全部计划).xlsx")
+if os.path.exists(quanzhan_keyword_file):
+    quanzhan_keyword_data, _ = read_excel(quanzhan_keyword_file, header_row=0)
+    print(f"读取全站推广搜索词: {len(quanzhan_keyword_data)} 条")
+else:
+    quanzhan_keyword_data = []
+    print("警告: 未找到全站推广搜索词文件")
+
+# 5. 读取标准推广数据
+biaozhun_account_file = os.path.join(RAW_DIR, "标准推广-账户概览(投放时段_2025-12-01_~_2025-12-31,计划类型_全部计划类型,所属于计划_全部计划,所属终端_全部终端,投放渠道_全部渠道,转化周期_1日累计周期).xlsx")
+biaozhun_account_data, _ = read_excel(biaozhun_account_file, header_row=0)
+print(f"读取标准推广账户概览: {len(biaozhun_account_data)} 条")
+
+biaozhun_product_file = os.path.join(RAW_DIR, "标准推广-商品(投放时段_2025-12-01_~_2025-12-31,计划类型_全部计划类型,所属于计划_全部计划,所属终端_全部终端,投放渠道_全部渠道,转化周期_1日累计周期).xlsx")
+biaozhun_product_data, _ = read_excel(biaozhun_product_file, header_row=0)
+print(f"读取标准推广商品: {len(biaozhun_product_data)} 条")
+
+biaozhun_keyword_file = os.path.join(RAW_DIR, "标准报告-搜索词(投放时段_2025-12-01_~_2025-12-31,计划类型_全部计划类型,所属于计划_全部计划,所属终端_全部终端,转化周期_1日累计周期,屏蔽状态_全部状态).xlsx")
+biaozhun_keyword_data, _ = read_excel(biaozhun_keyword_file, header_row=0)
+print(f"读取标准推广搜索词: {len(biaozhun_keyword_data)} 条")
+
+print("\n开始数据整合...")
+
+# 创建产品ID到图片和其他信息的映射
+product_image_map = {}
+for item in product_list_data:
+    pid = str(item.get('id', ''))
+    if pid and pid != 'None':
+        product_image_map[pid] = {
+            'image': item.get('图片', ''),
+            'title': item.get('标题', ''),
+            'owner': item.get('业务员', ''),
+            'showcase': item.get('橱窗产品', '否'),
+            'p4p': '是' if item.get('是否P4P') == 'Y' else '否'
+        }
+
+# 整合产品数据
+products_integrated = {}
+for item in products_data:
+    pid = str(item.get('产品ID', ''))
+    if not pid or pid == 'None':
+        continue
+    
+    # 从产品列表获取图片和其他信息
+    img_info = product_image_map.get(pid, {})
+    
+    products_integrated[pid] = {
+        'id': pid,
+        'title': item.get('产品名称', img_info.get('title', '')),
+        'image': img_info.get('image', ''),
+        'owner': item.get('产品负责人', img_info.get('owner', '')),
+        'showcase': item.get('是否橱窗', 'N'),
+        'p4p': item.get('是否P4P', 'N'),
+        # 搜索数据
+        'search_exposure': clean_number(item.get('搜索曝光次数', 0)),
+        'search_clicks': clean_number(item.get('搜索点击次数', 0)),
+        'search_ctr': item.get('搜索点击率', '0%'),
+        'visitors': clean_number(item.get('访问人数', 0)),
+        'inquiries': clean_number(item.get('询盘人数', 0)),
+        'tm_consult': clean_number(item.get('TM咨询人数 ', 0)),  # 注意：列名后面有空格
+        'total_leads': clean_number(item.get('询盘人数', 0)) + clean_number(item.get('TM咨询人数 ', 0)),  # 注意：列名后面有空格
+        # 全站推广数据
+        'quanzhan_exposure': clean_number(item.get('全站推广曝光次数', 0)),
+        'quanzhan_clicks': clean_number(item.get('全站推广点击次数', 0)),
+        # 标准推广数据
+        'biaozhun_exposure': clean_number(item.get('标准推广曝光次数', 0)),
+        'biaozhun_clicks': clean_number(item.get('标准推广点击次数', 0)),
+    }
+
+print(f"整合产品数据: {len(products_integrated)} 个产品")
+
+# 计算总数据
+total_quanzhan_cost = sum([clean_number(item.get('花费', 0)) for item in quanzhan_account_data])
+total_quanzhan_leads = sum([clean_number(item.get('全站商机量', 0)) for item in quanzhan_account_data])
+
+total_biaozhun_cost = sum([clean_number(item.get('花费', 0)) for item in biaozhun_account_data])
+total_biaozhun_leads = sum([clean_number(item.get('商机量', 0)) for item in biaozhun_account_data])
+
+total_cost = total_quanzhan_cost + total_biaozhun_cost
+total_leads = total_quanzhan_leads + total_biaozhun_leads
+total_cost_per_lead = total_cost / total_leads if total_leads > 0 else 0
+
+print(f"\n总花费: ￥{total_cost:.2f}")
+print(f"总商机: {total_leads}")
+print(f"总商机成本: ￥{total_cost_per_lead:.2f}")
+
+# 生成HTML报告
+print("\n开始生成HTML报告...")
+
+html_content = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>""" + SHOP_NAME + """-国际站数据分析报告(2025-12-01至2025-12-31)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .nav {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .nav-btn {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .nav-btn:hover, .nav-btn.active {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .page {
+            display: none;
+            padding: 30px;
+            animation: fadeIn 0.5s;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .summary-box {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card .label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+        }
+        
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+            overflow-x: auto;
+            position: relative;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+        }
+        
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        th {
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            cursor: pointer;
+            user-select: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+        }
+        
+        th:hover {
+            background: rgba(0,0,0,0.1);
+        }
+        
+        td {
+            padding: 12px 15px;
+            text-align: center;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .product-img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+        }
+        
+        .product-title {
+            text-align: left;
+            max-width: 300px;
+        }
+        
+        .product-id {
+            font-family: 'Courier New', monospace;
+            color: #6c757d;
+            font-size: 12px;
+        }
+        
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: bold;
+            margin: 2px;
+        }
+        
+        .tag-showcase {
+            background: #28a745;
+            color: white;
+        }
+        
+        .tag-p4p {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .highlight {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .keyword-table {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>""" + SHOP_NAME + """-国际站数据分析报告(2025-12-01至2025-12-31)</h1>
+            <p>数据周期: 2025-12-01 至 2025-12-31 | 生成时间: """ + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + """</p>
+        </div>
+        
+        <div class="nav">
+            <button class="nav-btn active" onclick="showPage(1)">各账号分析</button>
+            <button class="nav-btn" onclick="showPage(2)">总体数据分析</button>
+            <button class="nav-btn" onclick="showPage(3)">全站推广分析</button>
+            <button class="nav-btn" onclick="showPage(4)">标准推广分析</button>
+            <button class="nav-btn" onclick="showPage(5)">自然流量分析</button>
+            <button class="nav-btn" onclick="showPage(6)">Top 40 推广建议</button>
+        </div>
+"""
+
+# 第一页：各账号分析
+html_content += """
+        <div id="page1" class="page active">
+            <h2 style="margin-bottom: 20px; color: #667eea;">各账号分析信息</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>账号</th>
+                            <th>产品数</th>
+                            <th>有效产品数</th>
+                            <th>新发产品数</th>
+                            <th>修改产品数</th>
+                            <th>产品曝光</th>
+                            <th>产品点击</th>
+                            <th>询盘</th>
+                            <th>TM咨询客户数</th>
+                            <th>极速回复率</th>
+                            <th>及时回复率</th>
+                            <th>平均回复时间(h)</th>
+                            <th>实收信保订单数</th>
+                            <th>实收信保金额($)</th>
+                            <th>订单转化率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+
+# 过滤产品数大于0的账号，并按产品数降序排序
+valid_accounts = [acc for acc in accounts_data if clean_number(acc.get('产品数', 0)) > 0]
+valid_accounts.sort(key=lambda x: clean_number(x.get('产品数', 0)), reverse=True)
+
+# 计算总数和平均数
+total_products = sum([clean_number(acc.get('产品数', 0)) for acc in valid_accounts])
+total_valid_products = sum([clean_number(acc.get('有效产品数（不含全球E站)', 0)) for acc in valid_accounts])
+total_new_products = sum([clean_number(acc.get('新发产品数', 0)) for acc in valid_accounts])
+total_modified_products = sum([clean_number(acc.get('修改产品数', 0)) for acc in valid_accounts])
+total_exposure = sum([clean_number(acc.get('产品曝光', 0)) for acc in valid_accounts])
+total_clicks = sum([clean_number(acc.get('产品点击', 0)) for acc in valid_accounts])
+total_inquiries = sum([clean_number(acc.get('询盘', 0)) for acc in valid_accounts])
+total_tm = sum([clean_number(acc.get('TM咨询客户数', 0)) for acc in valid_accounts])
+total_orders = sum([clean_number(acc.get('实收信保订单个数', 0)) for acc in valid_accounts])
+total_order_amount = sum([clean_number(acc.get('实收信保订单金额（美元）', 0)) for acc in valid_accounts])
+
+avg_fast_reply = sum([clean_number(acc.get('极速回复率（5分钟）', 0)) for acc in valid_accounts]) / len(valid_accounts) if valid_accounts else 0
+avg_timely_reply = sum([clean_number(acc.get('及时回复率（24小时）', 0)) for acc in valid_accounts]) / len(valid_accounts) if valid_accounts else 0
+avg_reply_time = sum([clean_number(acc.get('平均回复时间 (小时)', 0)) for acc in valid_accounts]) / len(valid_accounts) if valid_accounts else 0
+avg_conversion = sum([clean_number(acc.get('订单转化率', 0)) for acc in valid_accounts]) / len(valid_accounts) if valid_accounts else 0
+
+for acc in valid_accounts:
+    html_content += f"""
+                    <tr>
+                        <td><strong>{acc.get('账号', '')}</strong></td>
+                        <td>{int(clean_number(acc.get('产品数', 0)))}</td>
+                        <td>{int(clean_number(acc.get('有效产品数（不含全球E站)', 0)))}</td>
+                        <td>{int(clean_number(acc.get('新发产品数', 0)))}</td>
+                        <td>{int(clean_number(acc.get('修改产品数', 0)))}</td>
+                        <td>{int(clean_number(acc.get('产品曝光', 0)))}</td>
+                        <td>{int(clean_number(acc.get('产品点击', 0)))}</td>
+                        <td>{int(clean_number(acc.get('询盘', 0)))}</td>
+                        <td>{int(clean_number(acc.get('TM咨询客户数', 0)))}</td>
+                        <td>{acc.get('极速回复率（5分钟）', '0%')}</td>
+                        <td>{acc.get('及时回复率（24小时）', '0%')}</td>
+                        <td>{clean_number(acc.get('平均回复时间 (小时)', 0)):.2f}</td>
+                        <td>{int(clean_number(acc.get('实收信保订单个数', 0)))}</td>
+                        <td>${clean_number(acc.get('实收信保订单金额（美元）', 0)):.2f}</td>
+                        <td>{acc.get('订单转化率', '0%')}</td>
+                    </tr>
+"""
+
+# 添加总计行
+html_content += f"""
+                    <tr style="background: #f8f9fa; font-weight: bold;">
+                        <td>总计/平均</td>
+                        <td>{int(total_products)}</td>
+                        <td>{int(total_valid_products)}</td>
+                        <td>{int(total_new_products)}</td>
+                        <td>{int(total_modified_products)}</td>
+                        <td>{int(total_exposure)}</td>
+                        <td>{int(total_clicks)}</td>
+                        <td>{int(total_inquiries)}</td>
+                        <td>{int(total_tm)}</td>
+                        <td>{avg_fast_reply:.2f}%</td>
+                        <td>{avg_timely_reply:.2f}%</td>
+                        <td>{avg_reply_time:.2f}</td>
+                        <td>{int(total_orders)}</td>
+                        <td>${total_order_amount:.2f}</td>
+                        <td>{avg_conversion:.2f}%</td>
+                    </tr>
+"""
+
+html_content += """
+                    </tbody>
+                </table>
+            </div>
+        </div>
+"""
+
+# 第二页：总体数据分析
+html_content += f"""
+        <div id="page2" class="page">
+            <h2 style="margin-bottom: 20px; color: #667eea;">总体数据分析</h2>
+            
+            <div class="summary-box">
+                <div class="stat-card">
+                    <div class="label">总花费</div>
+                    <div class="value">￥{total_cost:.2f}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总商机</div>
+                    <div class="value">{int(total_leads)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">全站推广商机成本</div>
+                    <div class="value">￥{total_quanzhan_cost/total_quanzhan_leads if total_quanzhan_leads > 0 else 0:.2f}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">标准推广商机成本</div>
+                    <div class="value">￥{total_biaozhun_cost/total_biaozhun_leads if total_biaozhun_leads > 0 else 0:.2f}</div>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <strong>说明：</strong> 以下展示曝光排名前100的产品，可点击表头进行排序。
+            </div>
+            
+            <div class="table-container">
+                <table id="productTable">
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>图片</th>
+                            <th>产品ID</th>
+                            <th>产品标题</th>
+                            <th>负责人</th>
+                            <th>搜索曝光次数</th>
+                            <th>搜索点击次数</th>
+                            <th>访问人数</th>
+                            <th>询盘人数</th>
+                            <th>TM咨询人数</th>
+                            <th>总商机数</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+
+# 按曝光排序，取前100
+sorted_products = sorted(products_integrated.values(), key=lambda x: x['search_exposure'], reverse=True)[:100]
+
+for idx, prod in enumerate(sorted_products, 1):
+    image_url = prod['image'] if prod['image'] else 'https://via.placeholder.com/60'
+    html_content += f"""
+                        <tr>
+                            <td>{idx}</td>
+                            <td><img src="{image_url}" class="product-img" alt="产品图片" onerror="this.src='https://via.placeholder.com/60'"></td>
+                            <td class="product-id">{prod['id']}</td>
+                            <td class="product-title">
+                                <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{prod['title']}">{prod['title']}</div>
+                                {'<span class="tag tag-showcase">橱窗</span>' if prod['showcase'] == 'Y' else ''}
+                                {'<span class="tag tag-p4p">P4P</span>' if prod['p4p'] == 'Y' else ''}
+                            </td>
+                            <td>{prod['owner']}</td>
+                            <td class="highlight">{int(prod['search_exposure'])}</td>
+                            <td>{int(prod['search_clicks'])}</td>
+                            <td>{int(prod['visitors'])}</td>
+                            <td>{int(prod['inquiries'])}</td>
+                            <td>{int(prod['tm_consult'])}</td>
+                            <td class="highlight">{int(prod['total_leads'])}</td>
+                        </tr>
+"""
+
+html_content += """
+                    </tbody>
+                </table>
+            </div>
+        </div>
+"""
+
+# 第三页：全站推广分析
+total_qz_cost = sum([clean_number(item.get('花费', 0)) for item in quanzhan_account_data])
+total_qz_leads = sum([clean_number(item.get('全站商机量', 0)) for item in quanzhan_account_data])
+total_qz_clicks = sum([clean_number(item.get('点击量', 0)) for item in quanzhan_account_data])
+total_qz_exposure = sum([clean_number(item.get('曝光量', 0)) for item in quanzhan_account_data])
+
+html_content += f"""
+        <div id="page3" class="page">
+            <h2 style="margin-bottom: 20px; color: #667eea;">全站推广分析</h2>
+            
+            <div class="summary-box">
+                <div class="stat-card">
+                    <div class="label">总花费</div>
+                    <div class="value">￥{total_qz_cost:.2f}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总商机</div>
+                    <div class="value">{int(total_qz_leads)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">商机成本</div>
+                    <div class="value">￥{total_qz_cost/total_qz_leads if total_qz_leads > 0 else 0:.2f}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总点击量</div>
+                    <div class="value">{int(total_qz_clicks)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总曝光量</div>
+                    <div class="value">{int(total_qz_exposure)}</div>
+                </div>
+            </div>
+            
+            <h3 style="margin: 30px 0 15px 0;">推广商品数据 (Top 30)</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>图片</th>
+                            <th>产品名称</th>
+                            <th>产品ID</th>
+                            <th>商机量</th>
+                            <th>点击量</th>
+                            <th>曝光量</th>
+                            <th>点击率</th>
+                            <th>询盘量</th>
+                            <th>TM咨询量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+
+# 按商机量排序
+sorted_qz_products = sorted(quanzhan_product_data, key=lambda x: clean_number(x.get('全站商机量', 0)), reverse=True)[:30]
+
+for idx, prod in enumerate(sorted_qz_products, 1):
+    pid = str(prod.get('产品ID', ''))
+    prod_info = products_integrated.get(pid, {})
+    image_url = prod_info.get('image', '') if prod_info else ''
+    if not image_url:
+        image_url = 'https://via.placeholder.com/60'
+    
+    html_content += f"""
+                        <tr>
+                            <td>{idx}</td>
+                            <td><img src="{image_url}" class="product-img" alt="产品图片" onerror="this.src='https://via.placeholder.com/60'"></td>
+                            <td style="text-align: left; max-width: 300px;">{prod.get('商品信息', '')}</td>
+                            <td class="product-id">{prod.get('产品ID', '')}</td>
+                            <td class="highlight">{int(clean_number(prod.get('全站商机量', 0)))}</td>
+                            <td>{int(clean_number(prod.get('点击量', 0)))}</td>
+                            <td>{int(clean_number(prod.get('曝光量', 0)))}</td>
+                            <td>{prod.get('点击率', '0%')}</td>
+                            <td>{int(clean_number(prod.get('询盘量', 0)))}</td>
+                            <td>{int(clean_number(prod.get('TM咨询量', 0)))}</td>
+                        </tr>
+"""
+
+html_content += """
+                    </tbody>
+                </table>
+            </div>
+            
+            <h3 style="margin: 30px 0 15px 0;">搜索词分析 (Top 50)</h3>
+            <div class="keyword-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>买家搜索词</th>
+                            <th>点击占比</th>
+                            <th>曝光占比</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+
+for idx, kw in enumerate(quanzhan_keyword_data[:50], 1):
+    html_content += f"""
+                        <tr>
+                            <td>{idx}</td>
+                            <td style="text-align: left;">{kw.get('买家搜索词', '')}</td>
+                            <td>{kw.get('点击占比', '0%')}</td>
+                            <td>{kw.get('曝光占比', '0%')}</td>
+                        </tr>
+"""
+
+html_content += """
+                    </tbody>
+                </table>
+            </div>
+        </div>
+"""
+
+# 第四页：标准推广分析
+total_bz_cost = sum([clean_number(item.get('花费', 0)) for item in biaozhun_account_data])
+total_bz_leads = sum([clean_number(item.get('商机量', 0)) for item in biaozhun_account_data])
+total_bz_clicks = sum([clean_number(item.get('点击量', 0)) for item in biaozhun_account_data])
+total_bz_exposure = sum([clean_number(item.get('曝光量', 0)) for item in biaozhun_account_data])
+
+html_content += f"""
+        <div id="page4" class="page">
+            <h2 style="margin-bottom: 20px; color: #667eea;">标准推广分析</h2>
+            
+            <div class="summary-box">
+                <div class="stat-card">
+                    <div class="label">总花费</div>
+                    <div class="value">￥{total_bz_cost:.2f}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总商机</div>
+                    <div class="value">{int(total_bz_leads)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">商机成本</div>
+                    <div class="value">￥{total_bz_cost/total_bz_leads if total_bz_leads > 0 else 0:.2f}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总点击量</div>
+                    <div class="value">{int(total_bz_clicks)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总曝光量</div>
+                    <div class="value">{int(total_bz_exposure)}</div>
+                </div>
+            </div>
+            
+            <h3 style="margin: 30px 0 15px 0;">推广商品数据 (Top 30)</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>图片</th>
+                            <th>产品名称</th>
+                            <th>产品ID</th>
+                            <th>花费</th>
+                            <th>商机量</th>
+                            <th>商机成本</th>
+                            <th>点击量</th>
+                            <th>曝光量</th>
+                            <th>点击率</th>
+                            <th>询盘量</th>
+                            <th>TM咨询量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+
+# 按商机量排序
+sorted_bz_products = sorted(biaozhun_product_data, key=lambda x: clean_number(x.get('商机量', 0)), reverse=True)[:30]
+
+for idx, prod in enumerate(sorted_bz_products, 1):
+    pid = str(prod.get('产品ID', ''))
+    prod_info = products_integrated.get(pid, {})
+    image_url = prod_info.get('image', '') if prod_info else ''
+    if not image_url:
+        image_url = 'https://via.placeholder.com/60'
+    
+    html_content += f"""
+                        <tr>
+                            <td>{idx}</td>
+                            <td><img src="{image_url}" class="product-img" alt="产品图片" onerror="this.src='https://via.placeholder.com/60'"></td>
+                            <td style="text-align: left; max-width: 300px;">{prod.get('商品信息', '')}</td>
+                            <td class="product-id">{prod.get('产品ID', '')}</td>
+                            <td>{prod.get('花费', '￥0.00')}</td>
+                            <td class="highlight">{int(clean_number(prod.get('商机量', 0)))}</td>
+                            <td>{prod.get('商机成本', '￥0.00')}</td>
+                            <td>{int(clean_number(prod.get('点击量', 0)))}</td>
+                            <td>{int(clean_number(prod.get('曝光量', 0)))}</td>
+                            <td>{prod.get('点击率', '0%')}</td>
+                            <td>{int(clean_number(prod.get('询盘量', 0)))}</td>
+                            <td>{int(clean_number(prod.get('TM咨询量', 0)))}</td>
+                        </tr>
+"""
+
+html_content += """
+                    </tbody>
+                </table>
+            </div>
+            
+            <h3 style="margin: 30px 0 15px 0;">搜索词分析 (Top 50)</h3>
+            <div class="keyword-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>买家搜索词</th>
+                            <th>花费</th>
+                            <th>商机量</th>
+                            <th>点击量</th>
+                            <th>曝光量</th>
+                            <th>点击率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+
+# 按商机量排序
+sorted_bz_keywords = sorted(biaozhun_keyword_data, key=lambda x: clean_number(x.get('商机量', 0)), reverse=True)[:50]
+
+for idx, kw in enumerate(sorted_bz_keywords, 1):
+    html_content += f"""
+                        <tr>
+                            <td>{idx}</td>
+                            <td style="text-align: left;">{kw.get('买家搜索词', '')}</td>
+                            <td>{kw.get('花费', '￥0.00')}</td>
+                            <td class="highlight">{int(clean_number(kw.get('商机量', 0)))}</td>
+                            <td>{int(clean_number(kw.get('点击量', 0)))}</td>
+                            <td>{int(clean_number(kw.get('曝光量', 0)))}</td>
+                            <td>{kw.get('点击率', '0%')}</td>
+                        </tr>
+"""
+
+html_content += """
+                    </tbody>
+                </table>
+            </div>
+        </div>
+"""
+
+# 第五页：自然流量分析
+# 自然流量 = 搜索曝光 - 全站推广曝光 - 标准推广曝光
+natural_products = []
+for pid, prod in products_integrated.items():
+    natural_exposure = prod['search_exposure'] - prod['quanzhan_exposure'] - prod['biaozhun_exposure']
+    natural_clicks = prod['search_clicks'] - prod['quanzhan_clicks'] - prod['biaozhun_clicks']
+    if natural_exposure > 0:
+        natural_products.append({
+            **prod,
+            'natural_exposure': natural_exposure,
+            'natural_clicks': natural_clicks
+        })
+
+natural_products_sorted = sorted(natural_products, key=lambda x: x['natural_exposure'], reverse=True)[:50]
+
+total_natural_exposure = sum([p['natural_exposure'] for p in natural_products])
+total_natural_clicks = sum([p['natural_clicks'] for p in natural_products])
+total_natural_leads = sum([p['total_leads'] for p in natural_products if p['natural_exposure'] > 0])
+
+html_content += f"""
+        <div id="page5" class="page">
+            <h2 style="margin-bottom: 20px; color: #667eea;">自然流量分析</h2>
+            
+            <div class="summary-box">
+                <div class="stat-card">
+                    <div class="label">总花费</div>
+                    <div class="value">￥0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总商机</div>
+                    <div class="value">{int(total_natural_leads)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">商机成本</div>
+                    <div class="value">￥0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总点击量</div>
+                    <div class="value">{int(total_natural_clicks)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总曝光量</div>
+                    <div class="value">{int(total_natural_exposure)}</div>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <strong>说明：</strong> 自然流量 = 搜索曝光 - 全站推广曝光 - 标准推广曝光
+            </div>
+            
+            <h3 style="margin: 30px 0 15px 0;">自然流量商品数据 (Top 50)</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>图片</th>
+                            <th>产品ID</th>
+                            <th>产品标题</th>
+                            <th>负责人</th>
+                            <th>自然曝光</th>
+                            <th>自然点击</th>
+                            <th>访问人数</th>
+                            <th>询盘人数</th>
+                            <th>TM咨询人数</th>
+                            <th>总商机数</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+
+for idx, prod in enumerate(natural_products_sorted, 1):
+    image_url = prod['image'] if prod['image'] else 'https://via.placeholder.com/60'
+    html_content += f"""
+                        <tr>
+                            <td>{idx}</td>
+                            <td><img src="{image_url}" class="product-img" alt="产品图片" onerror="this.src='https://via.placeholder.com/60'"></td>
+                            <td class="product-id">{prod['id']}</td>
+                            <td class="product-title">
+                                <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{prod['title']}">{prod['title']}</div>
+                            </td>
+                            <td>{prod['owner']}</td>
+                            <td class="highlight">{int(prod['natural_exposure'])}</td>
+                            <td>{int(prod['natural_clicks'])}</td>
+                            <td>{int(prod['visitors'])}</td>
+                            <td>{int(prod['inquiries'])}</td>
+                            <td>{int(prod['tm_consult'])}</td>
+                            <td class="highlight">{int(prod['total_leads'])}</td>
+                        </tr>
+"""
+
+html_content += """
+                    </tbody>
+                </table>
+            </div>
+        </div>
+"""
+
+# 第六页：Top 40推广建议
+# 计算平均商机转化率和点击率
+products_with_data = [p for p in products_integrated.values() if p['search_exposure'] > 0]
+
+# 计算商机转化率 = 总商机数 / 访问人数
+avg_conversion_rate = 0
+conversion_rates = []
+for p in products_with_data:
+    if p['visitors'] > 0:
+        conv_rate = p['total_leads'] / p['visitors'] * 100
+        conversion_rates.append(conv_rate)
+avg_conversion_rate = sum(conversion_rates) / len(conversion_rates) if conversion_rates else 0
+
+# 计算点击率 = 搜索点击次数 / 搜索曝光次数
+avg_ctr = 0
+ctrs = []
+for p in products_with_data:
+    if p['search_exposure'] > 0:
+        ctr = p['search_clicks'] / p['search_exposure'] * 100
+        ctrs.append(ctr)
+avg_ctr = sum(ctrs) / len(ctrs) if ctrs else 0
+
+# 筛选符合条件的产品：商机转化率和点击率都大于平均值
+qualified_products = []
+for p in products_with_data:
+    conv_rate = 0
+    if p['visitors'] > 0:
+        conv_rate = p['total_leads'] / p['visitors'] * 100
+    
+    ctr = 0
+    if p['search_exposure'] > 0:
+        ctr = p['search_clicks'] / p['search_exposure'] * 100
+    
+    # 只要有一个指标大于平均值就可以，或者两个都大于平均值
+    if (conv_rate >= avg_conversion_rate and ctr >= avg_ctr):
+        qualified_products.append({
+            **p,
+            'conversion_rate': conv_rate,
+            'ctr': ctr,
+            'score': conv_rate * 0.5 + ctr * 0.5  # 综合评分
+        })
+
+# 如果符合条件的产品不足40个，降低标准
+if len(qualified_products) < 40:
+    qualified_products = []
+    for p in products_with_data:
+        conv_rate = 0
+        if p['visitors'] > 0:
+            conv_rate = p['total_leads'] / p['visitors'] * 100
+        
+        ctr = 0
+        if p['search_exposure'] > 0:
+            ctr = p['search_clicks'] / p['search_exposure'] * 100
+        
+        # 降低标准：只要有一个指标大于平均值即可
+        if conv_rate >= avg_conversion_rate or ctr >= avg_ctr:
+            qualified_products.append({
+                **p,
+                'conversion_rate': conv_rate,
+                'ctr': ctr,
+                'score': conv_rate * 0.5 + ctr * 0.5
+            })
+
+# 如果还是不足，就按综合得分排序取前40
+if len(qualified_products) < 40:
+    qualified_products = []
+    for p in products_with_data:
+        conv_rate = 0
+        if p['visitors'] > 0:
+            conv_rate = p['total_leads'] / p['visitors'] * 100
+        
+        ctr = 0
+        if p['search_exposure'] > 0:
+            ctr = p['search_clicks'] / p['search_exposure'] * 100
+        
+        qualified_products.append({
+            **p,
+            'conversion_rate': conv_rate,
+            'ctr': ctr,
+            'score': p['search_exposure']*0.3 + p['search_clicks']*0.3 + p['total_leads']*0.4
+        })
+
+# 按综合得分排序
+top40_products = sorted(qualified_products, 
+                        key=lambda x: x['score'], 
+                        reverse=True)[:40]
+
+# 生成产品ID列表（用于复制）
+top40_ids = '\n'.join([p['id'] for p in top40_products])
+
+html_content += f"""
+        <div id="page6" class="page">
+            <h2 style="margin-bottom: 20px; color: #667eea;">Top 40 重点推广与橱窗展示建议</h2>
+            
+            <div class="info-box">
+                <strong>筛选标准：</strong>
+                <ul style="margin-top: 10px; margin-left: 20px;">
+                    <li>商机转化率平均值：{avg_conversion_rate:.2f}%</li>
+                    <li>点击率平均值：{avg_ctr:.2f}%</li>
+                    <li>优先选择商机转化率和点击率都 ≥ 平均值的产品</li>
+                    <li>按综合得分排序取Top 40</li>
+                </ul>
+            </div>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>图片</th>
+                            <th>产品ID</th>
+                            <th>产品标题</th>
+                            <th>负责人</th>
+                            <th>状态</th>
+                            <th>搜索曝光</th>
+                            <th>搜索点击</th>
+                            <th>点击率</th>
+                            <th>访问人数</th>
+                            <th>总商机</th>
+                            <th>商机转化率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+
+for idx, prod in enumerate(top40_products, 1):
+    image_url = prod['image'] if prod['image'] else 'https://via.placeholder.com/60'
+    
+    # 判断优秀标签（不包括橱窗和P4P）
+    status_tags = []
+    
+    # 判断点击率和转化率是否优秀
+    is_ctr_good = prod['ctr'] >= avg_ctr
+    is_conv_good = prod['conversion_rate'] >= avg_conversion_rate
+    
+    if is_ctr_good and is_conv_good:
+        status_tags.append('<span class="tag" style="background: #28a745; color: white;">双优</span>')
+    elif is_ctr_good:
+        status_tags.append('<span class="tag" style="background: #17a2b8; color: white;">点击率优</span>')
+    elif is_conv_good:
+        status_tags.append('<span class="tag" style="background: #ffc107; color: white;">转化率优</span>')
+    
+    status_html = ''.join(status_tags) if status_tags else '-'
+    
+    html_content += f"""
+                        <tr>
+                            <td>{idx}</td>
+                            <td><img src="{image_url}" class="product-img" alt="产品图片" onerror="this.src='https://via.placeholder.com/60'"></td>
+                            <td class="product-id">{prod['id']}</td>
+                            <td class="product-title">
+                                <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{prod['title']}">{prod['title']}</div>
+                            </td>
+                            <td>{prod['owner']}</td>
+                            <td>{status_html}</td>
+                            <td class="highlight">{int(prod['search_exposure'])}</td>
+                            <td>{int(prod['search_clicks'])}</td>
+                            <td>{prod['ctr']:.2f}%</td>
+                            <td>{int(prod['visitors'])}</td>
+                            <td class="highlight">{int(prod['total_leads'])}</td>
+                            <td>{prod['conversion_rate']:.2f}%</td>
+                        </tr>
+"""
+
+html_content += """
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-top: 30px; border-radius: 5px;">
+                <strong>📋 一键复制产品ID（共""" + str(len(top40_products)) + """个）：</strong>
+                <div style="margin-top: 10px;">
+                    <textarea id="productIds" readonly style="width: 100%; height: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 12px; resize: vertical;">""" + top40_ids + """</textarea>
+                    <button onclick="copyProductIds()" style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">📋 复制全部产品ID</button>
+                    <span id="copyStatus" style="margin-left: 10px; color: #28a745; font-weight: bold; display: none;">✓ 已复制！</span>
+                </div>
+            </div>
+        </div>
+"""
+
+# 添加JavaScript
+html_content += """
+    </div>
+    
+    <script>
+        function showPage(pageNum) {
+            // 隐藏所有页面
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.classList.remove('active'));
+            
+            // 显示选中的页面
+            document.getElementById('page' + pageNum).classList.add('active');
+            
+            // 更新导航按钮状态
+            const buttons = document.querySelectorAll('.nav-btn');
+            buttons.forEach((btn, idx) => {
+                if (idx + 1 === pageNum) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+        
+        function copyProductIds() {
+            const textarea = document.getElementById('productIds');
+            textarea.select();
+            textarea.setSelectionRange(0, 99999); // For mobile devices
+            
+            try {
+                document.execCommand('copy');
+                const status = document.getElementById('copyStatus');
+                status.style.display = 'inline';
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 2000);
+            } catch (err) {
+                alert('复制失败，请手动复制');
+            }
+        }
+        
+        function sortTable(columnIndex) {
+            const table = document.getElementById('productTable');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // 判断当前排序方向
+            const currentSort = table.dataset.sortColumn;
+            const currentDir = table.dataset.sortDir || 'asc';
+            const newDir = (currentSort == columnIndex && currentDir === 'asc') ? 'desc' : 'asc';
+            
+            rows.sort((a, b) => {
+                let aVal = a.cells[columnIndex].textContent.trim();
+                let bVal = b.cells[columnIndex].textContent.trim();
+                
+                // 尝试转换为数字
+                const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+                const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+                
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return newDir === 'asc' ? aNum - bNum : bNum - aNum;
+                } else {
+                    return newDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                }
+            });
+            
+            // 重新插入排序后的行
+            rows.forEach(row => tbody.appendChild(row));
+            
+            // 更新排序状态
+            table.dataset.sortColumn = columnIndex;
+            table.dataset.sortDir = newDir;
+        }
+        
+        function sortAnyTable(tableElement, columnIndex) {
+            const tbody = tableElement.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // 判断当前排序方向
+            const currentSort = tableElement.dataset.sortColumn;
+            const currentDir = tableElement.dataset.sortDir || 'asc';
+            const newDir = (currentSort == columnIndex && currentDir === 'asc') ? 'desc' : 'asc';
+            
+            rows.sort((a, b) => {
+                let aVal = a.cells[columnIndex].textContent.trim();
+                let bVal = b.cells[columnIndex].textContent.trim();
+                
+                // 尝试转换为数字
+                const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+                const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+                
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return newDir === 'asc' ? aNum - bNum : bNum - aNum;
+                } else {
+                    return newDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                }
+            });
+            
+            // 重新插入排序后的行
+            rows.forEach(row => tbody.appendChild(row));
+            
+            // 更新排序状态
+            tableElement.dataset.sortColumn = columnIndex;
+            tableElement.dataset.sortDir = newDir;
+        }
+        
+        // 页面加载后为所有表格添加排序功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const tables = document.querySelectorAll('table');
+            tables.forEach((table, tableIndex) => {
+                const headers = table.querySelectorAll('th');
+                headers.forEach((header, colIndex) => {
+                    header.style.cursor = 'pointer';
+                    header.addEventListener('click', function() {
+                        sortAnyTable(table, colIndex);
+                    });
+                    // 添加排序图标
+                    if (!header.querySelector('.sort-icon')) {
+                        const icon = document.createElement('span');
+                        icon.className = 'sort-icon';
+                        icon.innerHTML = ' ⇅';
+                        icon.style.opacity = '0.5';
+                        header.appendChild(icon);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+"""
+
+# 保存HTML文件
+output_file = os.path.join(BASE_DIR, f"{SHOP_NAME}-国际站数据分析报告(2025-12-01至2025-12-31).html")
+with open(output_file, 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+print("HTML报告已生成: " + output_file)
+
+# 移动旧报告和无关文件到archive文件夹
+archive_dir = os.path.join(BASE_DIR, "archive", "其它")
+os.makedirs(archive_dir, exist_ok=True)
+
+# 查找并移动旧报告
+for filename in os.listdir(BASE_DIR):
+    if filename.endswith('.html') and filename != f"{SHOP_NAME}-国际站数据分析报告(2025-12-01至2025-12-31).html":
+        old_file = os.path.join(BASE_DIR, filename)
+        new_file = os.path.join(archive_dir, filename)
+        try:
+            if os.path.exists(new_file):
+                os.remove(new_file)
+            os.rename(old_file, new_file)
+            print("已移动旧报告: " + filename + " -> archive/其它/")
+        except Exception as e:
+            print(f"移动文件失败 {filename}: {e}")
+
+print("所有任务完成！")
