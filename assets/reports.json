@@ -478,5 +478,101 @@
         "Href":  "suntehs/2025/12/月报/index.html",
         "LastWrite":  "2026-01-27 16:09",
         "Sort":  "202512\u00000"
+    },
+    {
+        "Account":  "mernus",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "01",
+        "Label":  "2026-01 服务报告",
+        "Folder":  "202601",
+        "Source":  "Z:\\电商部\\服务报告\\202601\\mernus-202601.pdf",
+        "Href":  "mernus/2026/01/服务报告/mernus-202601.pdf",
+        "LastWrite":  "2026-02-04 14:12",
+        "Sort":  "20260100"
+    },
+    {
+        "Account":  "suntehs",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "01",
+        "Label":  "2026-01 服务报告",
+        "Folder":  "202601",
+        "Source":  "Z:\\电商部\\服务报告\\202601\\suntehs-202601.pdf",
+        "Href":  "suntehs/2026/01/服务报告/suntehs-202601.pdf",
+        "LastWrite":  "2026-02-04 14:09",
+        "Sort":  "20260100"
+    },
+    {
+        "Account":  "mernus",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "02",
+        "Label":  "2026-02 服务报告",
+        "Folder":  "202602",
+        "Source":  "Z:\\电商部\\服务报告\\202602\\mernus-2026-02.pdf",
+        "Href":  "mernus/2026/02/服务报告/mernus-2026-02.pdf",
+        "LastWrite":  "2026-03-03 13:59",
+        "Sort":  "20260200"
+    },
+    {
+        "Account":  "suntehs",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "02",
+        "Label":  "2026-02 服务报告",
+        "Folder":  "202602",
+        "Source":  "Z:\\电商部\\服务报告\\202602\\suntehs-2026-02.pdf",
+        "Href":  "suntehs/2026/02/服务报告/suntehs-2026-02.pdf",
+        "LastWrite":  "2026-03-03 13:55",
+        "Sort":  "20260200"
+    },
+    {
+        "Account":  "mernus",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "03",
+        "Label":  "2026-03 服务报告",
+        "Folder":  "202603",
+        "Source":  "Z:\\电商部\\服务报告\\202603\\mernus202603.pdf",
+        "Href":  "mernus/2026/03/服务报告/mernus202603.pdf",
+        "LastWrite":  "2026-04-03 12:08",
+        "Sort":  "20260300"
+    },
+    {
+        "Account":  "suntehs",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "03",
+        "Label":  "2026-03 服务报告",
+        "Folder":  "202603",
+        "Source":  "Z:\\电商部\\服务报告\\202603\\suntehs202603.pdf",
+        "Href":  "suntehs/2026/03/服务报告/suntehs202603.pdf",
+        "LastWrite":  "2026-04-03 11:37",
+        "Sort":  "20260300"
+    },
+    {
+        "Account":  "mernus",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "04",
+        "Label":  "2026-04 服务报告",
+        "Folder":  "202604",
+        "Source":  "Z:\\电商部\\服务报告\\202604\\mernus-2026-04.pdf",
+        "Href":  "mernus/2026/04/服务报告/mernus-2026-04.pdf",
+        "LastWrite":  "2026-05-12 11:16",
+        "Sort":  "20260400"
+    },
+    {
+        "Account":  "suntehs",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "04",
+        "Label":  "2026-04 服务报告",
+        "Folder":  "202604",
+        "Source":  "Z:\\电商部\\服务报告\\202604\\suntehs-2026-04.pdf",
+        "Href":  "suntehs/2026/04/服务报告/suntehs-2026-04.pdf",
+        "LastWrite":  "2026-05-12 11:22",
+        "Sort":  "20260400"
     }
 ]
