@@ -49,6 +49,18 @@
     },
     {
         "Account":  "mernus",
+        "Kind":  "monthly",
+        "Year":  "2026",
+        "Month":  "05",
+        "Label":  "2026-05 月报",
+        "Folder":  "202605",
+        "Source":  "E:\\Gemini\\mernus\\202605\\mernus-国际站数据分析报告(2026-05-01至2026-05-31).html",
+        "Href":  "mernus/2026/05/月报/index.html",
+        "LastWrite":  "2026-06-04 10:09",
+        "Sort":  "202605\u00000"
+    },
+    {
+        "Account":  "mernus",
         "Kind":  "weekly",
         "Year":  "2026",
         "Month":  "04",
@@ -298,6 +310,18 @@
         "Href":  "suntehs/2026/05/周报/20260503-0509/index.html",
         "LastWrite":  "2026-05-12 13:03",
         "Sort":  "20260503"
+    },
+    {
+        "Account":  "suntehs",
+        "Kind":  "monthly",
+        "Year":  "2026",
+        "Month":  "05",
+        "Label":  "2026-05 月报",
+        "Folder":  "202605",
+        "Source":  "E:\\Gemini\\suntehs\\202605\\suntehs-国际站数据分析报告(2026-05-01至2026-05-31).html",
+        "Href":  "suntehs/2026/05/月报/index.html",
+        "LastWrite":  "2026-06-04 10:09",
+        "Sort":  "202605\u00000"
     },
     {
         "Account":  "suntehs",
