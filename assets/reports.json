@@ -598,5 +598,29 @@
         "Href":  "suntehs/2026/04/服务报告/suntehs-2026-04.pdf",
         "LastWrite":  "2026-05-12 11:22",
         "Sort":  "20260400"
+    },
+    {
+        "Account":  "mernus",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "05",
+        "Label":  "2026-05 服务报告",
+        "Folder":  "202605",
+        "Source":  "Z:\\电商部\\服务报告\\202605\\mernus-202605.pdf",
+        "Href":  "mernus/2026/05/服务报告/mernus-202605.pdf",
+        "LastWrite":  "2026-06-04 09:30",
+        "Sort":  "20260500"
+    },
+    {
+        "Account":  "suntehs",
+        "Kind":  "service",
+        "Year":  "2026",
+        "Month":  "05",
+        "Label":  "2026-05 服务报告",
+        "Folder":  "202605",
+        "Source":  "Z:\\电商部\\服务报告\\202605\\suntehs-202605.pdf",
+        "Href":  "suntehs/2026/05/服务报告/suntehs-202605.pdf",
+        "LastWrite":  "2026-06-04 09:32",
+        "Sort":  "20260500"
     }
 ]
