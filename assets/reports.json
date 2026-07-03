@@ -1,6 +1,18 @@
 ﻿[
     {
         "Account":  "suntehs",
+        "Kind":  "monthly",
+        "Year":  "2026",
+        "Month":  "06",
+        "Label":  "2026-06 月报",
+        "Folder":  "202606",
+        "Source":  "E:\\Gemini\\suntehs\\202606\\suntehs-国际站数据分析报告(2026-06-01至2026-06-30).html",
+        "Href":  "suntehs/2026/06/月报/index.html",
+        "LastWrite":  "2026-07-03 10:52",
+        "Sort":  "202606\u00000"
+    },
+    {
+        "Account":  "suntehs",
         "Kind":  "weekly",
         "Year":  "2026",
         "Month":  "06",
